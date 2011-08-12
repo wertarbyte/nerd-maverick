@@ -36,6 +36,7 @@ static uint16_t bar_state = 0;
 static void clear_bars(void) {
 	for (uint8_t i=0; i<=LAST(ledport); i++) {
 		*ledport[i].ddr &= ~(1<<ledport[i].bit);
+		*ledport[i].port &= ~(1<<ledport[i].bit);
 	}
 }
 
