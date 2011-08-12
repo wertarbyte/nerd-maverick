@@ -57,9 +57,19 @@ static void set_bar(uint8_t n, uint8_t state) {
 	}
 }
 
-static uint8_t ammo = 0;
+static uint8_t next_chamber_is_loaded(void) {
+	return (PIND & (1<<PD6)) == 0;
+}
+
+static uint8_t ammo_i = 0;
 
 static uint8_t ammo_btn_state = 0;
+
+static void clear_ammo(void) {
+	for (uint8_t i=0; i<6; i++) {
+		set_bar(i, 0);
+	}
+}
 
 int main(void) {
 	TCCR0B = (1<<CS01);
@@ -69,18 +79,28 @@ int main(void) {
 
 	PORTD |= 1<<PD4;
 
+	set_bar(9, 1);
+	set_bar(7, 1);
 	while (1) {
+		set_bar(8, next_chamber_is_loaded());
+
 		uint8_t ammo_btn = ((~PIND & (1<<PD4)) != 0);
-		if (ammo_btn && !ammo_btn_state) {
-			set_bar( ammo++, 1 );
-			_delay_ms(5);
+		set_bar(9, ammo_btn);
+		if (ammo_btn != ammo_btn_state) {
+			_delay_ms(50);
+			ammo_btn_state = ammo_btn;
+			if (!ammo_btn) {
+				_delay_ms(200);
+				set_bar( ammo_i++, next_chamber_is_loaded() );
+				ammo_i %= 6;
+			}
 		}
-		ammo_btn_state = ammo_btn;
 	}
 }
 
 SIGNAL(SIG_TIMER0_COMPA) {
 	static uint8_t cur = 0;
+	static uint8_t count = 0;
 	clear_bars();
 	if (bar_state & (1<<cur)) {
 		enable_bar(cur);
