@@ -12,10 +12,10 @@ struct port_t {
 };
 
 struct port_t ledport[] = {
-	{ &DDRB, &PORTB, PB0 },
-	{ &DDRB, &PORTB, PB1 },
-	{ &DDRB, &PORTB, PB2 },
-	{ &DDRB, &PORTB, PB3 },
+	{ &DDRB, &PORTB, PB0 }, /* RED */
+	{ &DDRB, &PORTB, PB1 }, /* YELLOW */
+	{ &DDRB, &PORTB, PB2 }, /* GREEN */
+	{ &DDRB, &PORTB, PB3 }, /* GREY */
 };
 
 static uint8_t led[10][2] = {
@@ -58,7 +58,7 @@ static void set_bar(uint8_t n, uint8_t state) {
 }
 
 static uint8_t next_chamber_is_loaded(void) {
-	return (PIND & (1<<PD6)) == 0;
+	return (PIND & (1<<PD2)) == 0;
 }
 
 static uint8_t ammo_i = 0;
