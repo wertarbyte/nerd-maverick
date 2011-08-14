@@ -118,6 +118,10 @@ int main(void) {
 	set_bar(9, 1);
 	while (1) {
 		set_bar(8, next_chamber_is_loaded());
+		if (!next_chamber_is_loaded()) {
+			/* we did see a light, so the next chamber is not loaded */
+			set_bar( ammo_i, 0);
+		}
 
 		uint8_t cocking_btn = gun_is_cocked();
 		set_bar(7, cocking_btn);
