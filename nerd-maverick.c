@@ -70,10 +70,12 @@ static uint8_t trigger_is_pulled(void) {
 	return (~PIND & (1<<PD0)) != 0;
 }
 
-static uint8_t ammo_i = 5;
+static uint8_t ammo_i = 0;
 
 static uint8_t barrel_btn_state = 0;
 static uint8_t cocking_btn_state = 0;
+
+static uint8_t current_barrel_clear = 0;
 
 static void clear_ammo(void) {
 	for (uint8_t i=0; i<6; i++) {
@@ -82,9 +84,10 @@ static void clear_ammo(void) {
 }
 
 static void barrel_rotated(void) {
+	set_bar( ammo_i, !current_barrel_clear );
+	current_barrel_clear = 0;
 	ammo_i++;
 	ammo_i %= 6;
-	set_bar( ammo_i, next_chamber_is_loaded() );
 }
 
 static void trigger_pulled(void) {
@@ -121,6 +124,7 @@ int main(void) {
 		if (!next_chamber_is_loaded()) {
 			/* we did see a light, so the next chamber is not loaded */
 			set_bar( ammo_i, 0);
+			current_barrel_clear = 0;
 		}
 
 		uint8_t cocking_btn = gun_is_cocked();
