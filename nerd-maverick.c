@@ -61,14 +61,38 @@ static uint8_t next_chamber_is_loaded(void) {
 	return (PIND & (1<<PD2)) == 0;
 }
 
-static uint8_t ammo_i = 0;
+static uint8_t gun_is_cocked(void) {
+	/* if the gun is cocked, the switch is _open_ */
+	return (~PIND & (1<<PD3)) == 0;
+}
 
-static uint8_t ammo_btn_state = 0;
+static uint8_t trigger_is_pulled(void) {
+	return (~PIND & (1<<PD0)) != 0;
+}
+
+static uint8_t ammo_i = 5;
+
+static uint8_t barrel_btn_state = 0;
+static uint8_t cocking_btn_state = 0;
 
 static void clear_ammo(void) {
 	for (uint8_t i=0; i<6; i++) {
 		set_bar(i, 0);
 	}
+}
+
+static void barrel_rotated(void) {
+	ammo_i++;
+	ammo_i %= 6;
+	set_bar( ammo_i, next_chamber_is_loaded() );
+}
+
+static void trigger_pulled(void) {
+
+}
+
+static void gun_fired(void) {
+	set_bar( ammo_i, 0 );
 }
 
 int main(void) {
@@ -77,24 +101,44 @@ int main(void) {
         TIMSK |= (1 << OCIE0A);
         sei();
 
+	PORTD |= 1<<PD0;
+	PORTD |= 1<<PD3;
 	PORTD |= 1<<PD4;
 
+	for (uint8_t n=0; n<10; n++) {
+		set_bar(n, 1);
+		_delay_ms(1000);
+	}
+	_delay_ms(5000);
+	for (uint8_t n=0; n<10; n++) {
+		set_bar(n, 0);
+		_delay_ms(1000);
+	}
+
 	set_bar(9, 1);
-	set_bar(7, 1);
 	while (1) {
 		set_bar(8, next_chamber_is_loaded());
 
-		uint8_t ammo_btn = ((~PIND & (1<<PD4)) != 0);
-		set_bar(9, ammo_btn);
-		if (ammo_btn != ammo_btn_state) {
-			_delay_ms(50);
-			ammo_btn_state = ammo_btn;
-			if (!ammo_btn) {
-				_delay_ms(200);
-				set_bar( ammo_i++, next_chamber_is_loaded() );
-				ammo_i %= 6;
+		uint8_t cocking_btn = gun_is_cocked();
+		set_bar(7, cocking_btn);
+		if (cocking_btn != cocking_btn_state) {
+			cocking_btn_state = cocking_btn;
+			if (!cocking_btn) {
+				gun_fired();
 			}
 		}
+
+		uint8_t barrel_btn = ((~PIND & (1<<PD4)) != 0);
+		set_bar(9, barrel_btn);
+		if (barrel_btn != barrel_btn_state) {
+			barrel_btn_state = barrel_btn;
+			if (!barrel_btn) {
+				/* wait until the chamber is rotated in front of the sensor */
+				_delay_ms(500);
+				barrel_rotated();
+			}
+		}
+		_delay_ms(50);
 	}
 }
 
