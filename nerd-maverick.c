@@ -57,8 +57,13 @@ static void set_bar(uint8_t n, uint8_t state) {
 	}
 }
 
-static uint8_t next_chamber_is_loaded(void) {
-	return (PIND & (1<<PD2)) == 0;
+/* this function indicates whether the sensor does
+ * pick up an empty chamber; however, this is no definitive
+ * answer since the barrel might be rotated to an awkward
+ * position!
+ */
+static uint8_t empty_chamber_visible(void) {
+	return (PIND & (1<<PD2)) != 0;
 }
 
 static uint8_t gun_is_cocked(void) {
@@ -70,24 +75,42 @@ static uint8_t trigger_is_pulled(void) {
 	return (~PIND & (1<<PD0)) != 0;
 }
 
-static uint8_t ammo_i = 0;
-
-static uint8_t barrel_btn_state = 0;
-static uint8_t cocking_btn_state = 0;
-
-static uint8_t current_barrel_clear = 0;
+/* bitmask indicating the states of the chambers */
+static uint8_t chambers = 0;
+/* if we can shine a light through the chamber at any point
+ * during the rotation, we set this flag; so if this flag is
+ * still 0 at the end of a rotation, the chamber is obviously
+ * loaded
+ */
+static uint8_t current_chamber_empty = 0;
 
 static void clear_ammo(void) {
+	chambers = 0;
+}
+
+static void rotate_chambers(void) {
+	uint8_t overflow = (chambers & 1);
+	chambers = (chambers>>1) | (overflow<<5);
+}
+
+static void display_chambers(void) {
 	for (uint8_t i=0; i<6; i++) {
-		set_bar(i, 0);
+		set_bar(i, chambers&(1<<i));
 	}
 }
 
 static void barrel_rotated(void) {
-	set_bar( ammo_i, !current_barrel_clear );
-	current_barrel_clear = 0;
-	ammo_i++;
-	ammo_i %= 6;
+	/* we are now moving on to the next chamber,
+	 * did we see any light during this rotation?
+	 * if yes, the chamber was empty
+	 */
+	if (current_chamber_empty) { /* light has been seen */
+		chambers &= ~1;
+	} else { /* it was dark the entire time, so the chamber is loaded */
+		chambers |= 1;
+	}
+	current_chamber_empty = 0;
+	rotate_chambers();
 }
 
 static void trigger_pulled(void) {
@@ -95,10 +118,15 @@ static void trigger_pulled(void) {
 }
 
 static void gun_fired(void) {
-	set_bar( ammo_i, 0 );
+	chambers &= ~1;
+	current_chamber_empty = 1;
 }
 
 int main(void) {
+	/* edge detection */
+	static uint8_t barrel_btn_state = 0;
+	static uint8_t cocking_btn_state = 0;
+
 	TCCR0B = (1<<CS01);
 	OCR0A = 0xFA;
         TIMSK |= (1 << OCIE0A);
@@ -120,11 +148,11 @@ int main(void) {
 
 	set_bar(9, 1);
 	while (1) {
-		set_bar(8, next_chamber_is_loaded());
-		if (!next_chamber_is_loaded()) {
-			/* we did see a light, so the next chamber is not loaded */
-			set_bar( ammo_i, 0);
-			current_barrel_clear = 0;
+		set_bar(8, !empty_chamber_visible());
+		if (empty_chamber_visible()) {
+			/* we did see a light, so the upcoming chamber is not loaded */
+			chambers &= ~1;
+			current_chamber_empty = 1;
 		}
 
 		uint8_t cocking_btn = gun_is_cocked();
@@ -141,18 +169,16 @@ int main(void) {
 		if (barrel_btn != barrel_btn_state) {
 			barrel_btn_state = barrel_btn;
 			if (!barrel_btn) {
-				/* wait until the chamber is rotated in front of the sensor */
-				_delay_ms(500);
 				barrel_rotated();
 			}
 		}
 		_delay_ms(50);
+		display_chambers();
 	}
 }
 
 SIGNAL(SIG_TIMER0_COMPA) {
 	static uint8_t cur = 0;
-	static uint8_t count = 0;
 	clear_bars();
 	if (bar_state & (1<<cur)) {
 		enable_bar(cur);
