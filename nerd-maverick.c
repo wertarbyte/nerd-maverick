@@ -57,6 +57,22 @@ static void set_bar(uint8_t n, uint8_t state) {
 	}
 }
 
+/* debounce the port by waiting until a change has stabilized
+ */
+
+static void debounce( volatile uint8_t *port, uint8_t mask ) {
+	uint8_t buf;
+	uint8_t debounced_buf;
+	for (debounced_buf=0; debounced_buf!=0xFF; ) {
+		debounced_buf <<= 1;
+		buf = *port;
+		_delay_us(150);
+		if ( (*port & mask) == (buf & mask) ) {
+			debounced_buf |= 0x01;
+		}
+	}
+}
+
 /* this function indicates whether the sensor does
  * pick up an empty chamber; however, this is no definitive
  * answer since the barrel might be rotated to an awkward
@@ -148,12 +164,16 @@ int main(void) {
 
 	set_bar(9, 1);
 	while (1) {
-		set_bar(8, !empty_chamber_visible());
-		if (empty_chamber_visible()) {
+		uint8_t visibility = empty_chamber_visible();
+		set_bar(8, !visibility);
+		if (visibility) {
 			/* we did see a light, so the upcoming chamber is not loaded */
 			chambers &= ~1;
 			current_chamber_empty = 1;
 		}
+
+		/* wait until switches have stabilized */
+		debounce( &PIND, (1<<PD0)|(1<<PD3)|(1<<PD4) );
 
 		uint8_t cocking_btn = gun_is_cocked();
 		set_bar(7, cocking_btn);
@@ -172,7 +192,6 @@ int main(void) {
 				barrel_rotated();
 			}
 		}
-		_delay_ms(50);
 		display_chambers();
 	}
 }
