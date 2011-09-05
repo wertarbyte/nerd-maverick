@@ -129,10 +129,6 @@ static void barrel_rotated(void) {
 	rotate_chambers();
 }
 
-static void trigger_pulled(void) {
-
-}
-
 static void gun_fired(void) {
 	chambers &= ~1;
 	current_chamber_empty = 1;
